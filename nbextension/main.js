@@ -169,6 +169,45 @@ Be concise and practical.`;
 
   function modelKey(tab) { return 'rb_model_' + tab; }
 
+  function getModelList() {
+    const saved = localStorage.getItem('rb_models');
+    if (saved) {
+      const list = saved.split('\n').map(s => s.trim()).filter(Boolean);
+      if (list.length) return list;
+    }
+    return MODELS;
+  }
+
+  function rebuildModelSelect(keepValue) {
+    const sel = document.getElementById('rb-model-sel');
+    if (!sel) return;
+    const models = getModelList();
+    sel.innerHTML = models.map(m => `<option value="${m}">${m}</option>`).join('');
+    const target = keepValue || localStorage.getItem(modelKey(currentTab)) || models[0];
+    sel.value = models.includes(target) ? target : models[0];
+  }
+
+  function togglePrefs() {
+    const prefs = document.getElementById('rb-prefs');
+    if (!prefs) return;
+    const nowHidden = prefs.classList.toggle('rb-hidden');
+    if (!nowHidden) {
+      const ta = document.getElementById('rb-models-input');
+      if (ta) ta.value = getModelList().join('\n');
+    }
+  }
+
+  function savePrefs() {
+    const ta = document.getElementById('rb-models-input');
+    if (!ta) return;
+    const models = ta.value.split('\n').map(s => s.trim()).filter(Boolean);
+    if (!models.length) return;
+    localStorage.setItem('rb_models', models.join('\n'));
+    const current = document.getElementById('rb-model-sel')?.value;
+    rebuildModelSelect(current);
+    document.getElementById('rb-prefs')?.classList.add('rb-hidden');
+  }
+
   function getModel() {
     const el = document.getElementById('rb-model-sel');
     return el ? el.value : MODELS[0];
@@ -400,9 +439,12 @@ Be concise and practical.`;
           <button id="rb-tab-chat"   class="rb-tab"        onclick="rbTab('chat')">Chat</button>
         </div>
         <div class="rb-row" id="rb-model-row">
-          <select id="rb-model-sel" class="rb-select">
-            ${MODELS.map(m => `<option value="${m}">${m}</option>`).join('')}
-          </select>
+          <select id="rb-model-sel" class="rb-select"></select>
+          <button class="rb-key-toggle" onclick="rbTogglePrefs()" title="Preferences">⚙</button>
+        </div>
+        <div id="rb-prefs" class="rb-hidden">
+          <textarea id="rb-models-input" placeholder="One model name per line…"></textarea>
+          <button id="rb-prefs-save" onclick="rbSavePrefs()">Save</button>
         </div>
         <div class="rb-row" id="rb-key-row">
           <input id="rb-key-input" class="rb-input" type="password" placeholder="API Key (leave blank to use .env or env var)" />
@@ -413,8 +455,8 @@ Be concise and practical.`;
       </div>`;
     document.body.appendChild(panel);
 
+    rebuildModelSelect();
     const sel = document.getElementById('rb-model-sel');
-    sel.value = localStorage.getItem(modelKey('code')) || MODELS[0];
     sel.onchange = () => localStorage.setItem(modelKey(currentTab), sel.value);
 
     document.getElementById('rb-close').onclick = () => {
@@ -442,10 +484,12 @@ Be concise and practical.`;
 
   // ── Global functions called from HTML onclick ─────────────────────────────────
 
-  window.rbTab         = switchTab;
-  window.rbVoiceRecord = handleVoiceRecord;
-  window.rbAction      = handleAction;
-  window.rbChatVoice   = handleChatVoice;
+  window.rbTab          = switchTab;
+  window.rbVoiceRecord  = handleVoiceRecord;
+  window.rbAction       = handleAction;
+  window.rbChatVoice    = handleChatVoice;
+  window.rbTogglePrefs  = togglePrefs;
+  window.rbSavePrefs    = savePrefs;
   window.rbChatSend    = () => sendChat(document.getElementById('rb-chat-input')?.value || '');
   window.rbSaveKey     = saveApiKey;
   window.rbToggleKey   = () => {

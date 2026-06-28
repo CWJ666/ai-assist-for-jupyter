@@ -8,6 +8,45 @@ import { INotebookTracker, NotebookActions } from '@jupyterlab/notebook';
 
 const MODELS = ['gpt-5.5-pro', 'gpt-5.5', 'gpt-5-mini', 'gpt-5.4-thinking', 'gpt-5.2-codex'];
 
+function getModelList(): string[] {
+  const saved = localStorage.getItem('rb_models');
+  if (saved) {
+    const list = saved.split('\n').map((s: string) => s.trim()).filter(Boolean);
+    if (list.length) return list;
+  }
+  return MODELS;
+}
+
+function rebuildModelSelect(keepValue?: string): void {
+  const sel = document.getElementById('rb-model-sel') as HTMLSelectElement | null;
+  if (!sel) return;
+  const models = getModelList();
+  sel.innerHTML = models.map(m => `<option value="${m}">${m}</option>`).join('');
+  const target = keepValue || localStorage.getItem(modelKey(currentTab)) || models[0];
+  sel.value = models.includes(target) ? target : models[0];
+}
+
+function togglePrefs(): void {
+  const prefs = document.getElementById('rb-prefs');
+  if (!prefs) return;
+  const nowHidden = prefs.classList.toggle('rb-hidden');
+  if (!nowHidden) {
+    const ta = document.getElementById('rb-models-input') as HTMLTextAreaElement | null;
+    if (ta) ta.value = getModelList().join('\n');
+  }
+}
+
+function savePrefs(): void {
+  const ta = document.getElementById('rb-models-input') as HTMLTextAreaElement | null;
+  if (!ta) return;
+  const models = ta.value.split('\n').map((s: string) => s.trim()).filter(Boolean);
+  if (!models.length) return;
+  localStorage.setItem('rb_models', models.join('\n'));
+  const current = (document.getElementById('rb-model-sel') as HTMLSelectElement | null)?.value;
+  rebuildModelSelect(current);
+  document.getElementById('rb-prefs')?.classList.add('rb-hidden');
+}
+
 const PROMPT_CODE = `You are a Python data analysis assistant in a Jupyter notebook.
 Generate clean, runnable Python code for the user's request.
 - Use pandas, numpy, matplotlib, seaborn as needed
@@ -430,9 +469,12 @@ function buildPanel(): void {
         <button id="rb-tab-chat"   class="rb-tab"        onclick="rbLabTab('chat')">Chat</button>
       </div>
       <div class="rb-row" id="rb-model-row">
-        <select id="rb-model-sel" class="rb-select">
-          ${MODELS.map(m => `<option value="${m}">${m}</option>`).join('')}
-        </select>
+        <select id="rb-model-sel" class="rb-select"></select>
+        <button class="rb-key-toggle" onclick="rbLabTogglePrefs()" title="Preferences">⚙</button>
+      </div>
+      <div id="rb-prefs" class="rb-hidden">
+        <textarea id="rb-models-input" placeholder="One model name per line…"></textarea>
+        <button id="rb-prefs-save" onclick="rbLabSavePrefs()">Save</button>
       </div>
       <div class="rb-row" id="rb-key-row">
         <input id="rb-key-input" class="rb-input" type="password" placeholder="API Key (leave blank to use .env or env var)" />
@@ -462,8 +504,8 @@ function buildPanel(): void {
   });
   ro.observe(panel);
 
+  rebuildModelSelect();
   const sel = document.getElementById('rb-model-sel') as HTMLSelectElement;
-  sel.value = localStorage.getItem(modelKey('code')) || MODELS[0];
   sel.onchange = () => localStorage.setItem(modelKey(currentTab), sel.value);
 
   document.getElementById('rb-close')!.onclick = () => {
@@ -514,10 +556,12 @@ function buildPanel(): void {
 }
 
 // Expose to HTML onclick
-(window as any).rbLabTab         = switchTab;
-(window as any).rbLabVoiceRecord = handleVoiceRecord;
-(window as any).rbLabAction      = handleAction;
-(window as any).rbLabChatVoice   = handleChatVoice;
+(window as any).rbLabTab          = switchTab;
+(window as any).rbLabVoiceRecord  = handleVoiceRecord;
+(window as any).rbLabAction       = handleAction;
+(window as any).rbLabChatVoice    = handleChatVoice;
+(window as any).rbLabTogglePrefs  = togglePrefs;
+(window as any).rbLabSavePrefs    = savePrefs;
 (window as any).rbLabChatSend   = () => sendChat((document.getElementById('rb-chat-input') as HTMLTextAreaElement | null)?.value || '');
 (window as any).rbLabSaveKey    = saveApiKey;
 (window as any).rbLabToggleKey  = () => {

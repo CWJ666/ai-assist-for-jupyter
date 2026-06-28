@@ -3,6 +3,22 @@ import {
   JupyterFrontEndPlugin
 } from '@jupyterlab/application';
 import { INotebookTracker, NotebookActions } from '@jupyterlab/notebook';
+import { Widget } from '@lumino/widgets';
+import { LabIcon } from '@jupyterlab/ui-components';
+
+// ── Sidebar icon ──────────────────────────────────────────────────────────────
+
+const robotIconSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <rect x="5" y="9" width="14" height="11" rx="2" fill="currentColor"/>
+  <rect x="8.5" y="6" width="7" height="3" rx="1" fill="currentColor"/>
+  <circle cx="3" cy="14" r="1.5" fill="currentColor"/>
+  <circle cx="21" cy="14" r="1.5" fill="currentColor"/>
+  <circle cx="9.5" cy="15" r="1.5" fill="white"/>
+  <circle cx="14.5" cy="15" r="1.5" fill="white"/>
+  <rect x="8.5" y="18" width="7" height="1" rx=".5" fill="white"/>
+</svg>`;
+
+const robotIcon = new LabIcon({ name: 'rb-assistant:icon', svgstr: robotIconSvg });
 
 // ── Agent config ──────────────────────────────────────────────────────────────
 
@@ -34,7 +50,6 @@ const AGENTS = {
 } as const;
 
 type AgentId = keyof typeof AGENTS;
-
 const AGENT_IDS = Object.keys(AGENTS) as AgentId[];
 
 // ── Prompts ───────────────────────────────────────────────────────────────────
@@ -107,27 +122,16 @@ function setStatus(text: string, isError = false): void {
 // ── Agent switching ───────────────────────────────────────────────────────────
 
 function switchAgent(agentId: AgentId): void {
-  // Save current model selection before switching
   const sel = document.getElementById('rb-model-sel') as HTMLSelectElement | null;
   if (sel) localStorage.setItem(modelSelKey(currentAgent, currentTab), sel.value);
-
   currentAgent = agentId;
   localStorage.setItem('rb_agent', agentId);
-
-  // Rebuild model list for new agent
   rebuildModelSelect();
-
-  // Sync agent selector UI
-  const agentSel = document.getElementById('rb-agent-sel') as HTMLSelectElement | null;
-  if (agentSel) agentSel.value = agentId;
-
-  // Update prefs textarea if open
   const prefsEl = document.getElementById('rb-prefs');
   if (prefsEl && !prefsEl.classList.contains('rb-hidden')) {
     const ta = document.getElementById('rb-models-input') as HTMLTextAreaElement | null;
     if (ta) ta.value = getModelList().join('\n');
   }
-
   setStatus('');
 }
 
@@ -195,11 +199,7 @@ async function getApiKey(): Promise<string> {
     future.onIOPub = (msg: any) => {
       if (done) return;
       const text = (msg.content?.text || '').trim();
-      if (text) {
-        done = true;
-        localStorage.setItem(agent().storageKey, text);
-        resolve(text);
-      }
+      if (text) { done = true; localStorage.setItem(agent().storageKey, text); resolve(text); }
     };
     setTimeout(() => { if (!done) reject(new Error(`${agent().label} API Key not found. Please enter it in the panel.`)); }, 5000);
   });
@@ -236,7 +236,6 @@ async function transcribe(blob: Blob, ext: string, apiKey: string): Promise<stri
   const fd = new FormData();
   fd.append('file', blob, `rec.${ext}`);
   fd.append('model', 'whisper-1');
-  // Whisper is OpenAI-only; always use OpenAI endpoint for transcription
   const r = await fetch('https://api.openai.com/v1/audio/transcriptions', {
     method: 'POST',
     headers: { 'Authorization': 'Bearer ' + apiKey },
@@ -253,7 +252,6 @@ async function chatComplete(
   apiKey: string
 ): Promise<string> {
   const cfg = agent();
-
   if (cfg.format === 'anthropic') {
     const r = await fetch(cfg.baseUrl + '/v1/messages', {
       method: 'POST',
@@ -268,15 +266,10 @@ async function chatComplete(
     if (!r.ok) throw new Error('Anthropic: ' + await r.text());
     return ((await r.json()) as any).content[0].text.trim();
   }
-
-  // OpenAI-compatible (OpenAI + Google Gemini)
   const r = await fetch(cfg.baseUrl + '/chat/completions', {
     method: 'POST',
     headers: { 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model,
-      messages: [{ role: 'system', content: systemPrompt }, ...messages],
-    }),
+    body: JSON.stringify({ model, messages: [{ role: 'system', content: systemPrompt }, ...messages] }),
   });
   if (!r.ok) throw new Error(`${cfg.label}: ` + await r.text());
   return ((await r.json()) as any).choices[0].message.content.trim();
@@ -311,7 +304,6 @@ async function startRecording(onStop: (blob: Blob, ext: string) => Promise<void>
   let stream: MediaStream;
   try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
   catch { throw new Error('Microphone access denied'); }
-
   const mime = ['audio/webm', 'audio/mp4', 'audio/ogg'].find(t => MediaRecorder.isTypeSupported(t)) || '';
   audioChunks = [];
   mediaRecorder = new MediaRecorder(stream, mime ? { mimeType: mime } : {});
@@ -335,9 +327,8 @@ function stopRecording(): void {
 async function handleVoiceRecord(): Promise<void> {
   if (isRecording) { stopRecording(); return; }
 
-  let apiKey: string;
-  // For transcription we always need an OpenAI key (Whisper)
   const whisperKey = localStorage.getItem('rb_key_openai') || localStorage.getItem('rb_openai_key') || '';
+  let apiKey: string;
   try { apiKey = whisperKey || await getApiKey(); }
   catch (e: any) { setStatus('❌ ' + e.message, true); return; }
 
@@ -358,10 +349,8 @@ async function handleVoiceRecord(): Promise<void> {
         if (!text) throw new Error('No speech detected');
         const voiceBox = document.getElementById('rb-voice-text') as HTMLTextAreaElement | null;
         if (voiceBox) voiceBox.value = text;
-        setStatus('✓ Done. Edit if needed, then click the button below.');
-      } catch (e: any) {
-        setStatus('❌ ' + e.message, true);
-      }
+        setStatus('✓ Done. Edit if needed, then click a button below.');
+      } catch (e: any) { setStatus('❌ ' + e.message, true); }
       btn.disabled = false;
     });
   } catch (e: any) {
@@ -397,9 +386,7 @@ async function handleAction(mode: 'code' | 'polish'): Promise<void> {
       insertMarkdownCell(bullets);
       setStatus('✓ Notes inserted (two-column layout)');
     }
-  } catch (e: any) {
-    setStatus('❌ ' + e.message, true);
-  }
+  } catch (e: any) { setStatus('❌ ' + e.message, true); }
   if (actionBtn) actionBtn.disabled = false;
 }
 
@@ -415,7 +402,6 @@ async function handleChatVoice(): Promise<void> {
 
   btn.classList.add('recording');
   setStatus('Recording…');
-
   try {
     await startRecording(async (blob, ext) => {
       btn.classList.remove('recording');
@@ -423,9 +409,7 @@ async function handleChatVoice(): Promise<void> {
         setStatus('Transcribing…');
         const text = await transcribe(blob, ext, apiKey);
         if (text) await sendChat(text);
-      } catch (e: any) {
-        setStatus('❌ ' + e.message, true);
-      }
+      } catch (e: any) { setStatus('❌ ' + e.message, true); }
     });
   } catch (e: any) {
     btn.classList.remove('recording');
@@ -455,22 +439,18 @@ async function sendChat(text: string): Promise<void> {
   const input = document.getElementById('rb-chat-input') as HTMLTextAreaElement | null;
   if (input) input.value = '';
   setStatus('Thinking…');
-
   let apiKey: string;
   try { apiKey = await getApiKey(); }
   catch (e: any) { setStatus('❌ ' + e.message, true); return; }
-
   try {
     const reply = await chatComplete(PROMPT_CHAT, chatHistory, getModel(), apiKey);
     chatHistory.push({ role: 'assistant', content: reply });
     appendBubble('assistant', reply);
     setStatus('');
-  } catch (e: any) {
-    setStatus('❌ ' + e.message, true);
-  }
+  } catch (e: any) { setStatus('❌ ' + e.message, true); }
 }
 
-// ── Panel ─────────────────────────────────────────────────────────────────────
+// ── Tab content ───────────────────────────────────────────────────────────────
 
 function renderTabContent(tab: string): void {
   ['rb-action-area', 'rb-chat-area'].forEach(id => document.getElementById(id)?.remove());
@@ -510,14 +490,12 @@ function renderTabContent(tab: string): void {
 function switchTab(tab: string): void {
   const sel = document.getElementById('rb-model-sel') as HTMLSelectElement | null;
   if (sel) localStorage.setItem(modelSelKey(currentAgent, currentTab), sel.value);
-
   currentTab = tab;
   ['input', 'chat'].forEach(t => {
     document.getElementById('rb-tab-' + t)?.classList.toggle('active', t === tab);
   });
   renderTabContent(tab);
   setStatus('');
-
   if (sel) {
     const saved = localStorage.getItem(modelSelKey(currentAgent, tab));
     const models = getModelList();
@@ -525,134 +503,57 @@ function switchTab(tab: string): void {
   }
 }
 
-function buildPanel(): void {
-  if (document.getElementById('rb-panel')) return;
+// ── Sidebar Widget ────────────────────────────────────────────────────────────
 
-  const link = document.createElement('link');
-  link.rel  = 'stylesheet';
-  link.type = 'text/css';
-  link.href = (window as any).__rbLabCssUrl || '';
-  document.head.appendChild(link);
+class AIAssistantWidget extends Widget {
+  constructor() {
+    super();
+    this.id = 'rb-assistant-panel';
+    this.title.label = 'AI';
+    this.title.caption = 'AI Assistant';
+    this.title.icon = robotIcon;
+    this.title.closable = true;
+    this.addClass('rb-assistant-widget');
 
-  const toggle = document.createElement('button');
-  toggle.id = 'rb-toggle';
-  toggle.title = 'AI Assistant';
-  toggle.innerHTML = '🤖';
-  toggle.onclick = () => {
-    document.getElementById('rb-panel')?.classList.remove('rb-hidden');
-    toggle.style.display = 'none';
-  };
-  document.body.appendChild(toggle);
-
-  const panel = document.createElement('div');
-  panel.id = 'rb-panel';
-  panel.classList.add('rb-hidden');
-  panel.innerHTML = `
-    <div id="rb-resize-handle" title="Resize"></div>
-    <div id="rb-header">
-      <span>🤖 AI Assistant</span>
-      <button id="rb-close" title="Close">✕</button>
-    </div>
-    <div id="rb-body">
-      <div id="rb-tabs">
-        <button id="rb-tab-input" class="rb-tab active" onclick="rbLabTab('input')">Input</button>
-        <button id="rb-tab-chat"  class="rb-tab"        onclick="rbLabTab('chat')">Chat</button>
-      </div>
-      <div class="rb-row" id="rb-agent-model-row">
-        <select id="rb-agent-sel" class="rb-select rb-select-agent" onchange="rbLabSwitchAgent(this.value)">
-          ${AGENT_IDS.map(id => `<option value="${id}">${AGENTS[id].label}</option>`).join('')}
-        </select>
-        <select id="rb-model-sel" class="rb-select"></select>
-        <button class="rb-key-toggle" onclick="rbLabTogglePrefs()" title="Edit model list">⚙</button>
-      </div>
-      <div id="rb-prefs" class="rb-hidden">
-        <textarea id="rb-models-input" placeholder="One model name per line…"></textarea>
-        <div class="rb-row" style="gap:6px">
-          <button id="rb-prefs-reset" onclick="rbLabResetPrefs()" style="flex:1">Reset</button>
-          <button id="rb-prefs-save"  onclick="rbLabSavePrefs()"  style="flex:2">Save</button>
+    this.node.innerHTML = `
+      <div id="rb-body">
+        <div id="rb-tabs">
+          <button id="rb-tab-input" class="rb-tab active" onclick="rbLabTab('input')">Input</button>
+          <button id="rb-tab-chat"  class="rb-tab"        onclick="rbLabTab('chat')">Chat</button>
         </div>
-      </div>
-      <div class="rb-row" id="rb-key-row">
-        <input id="rb-key-input" class="rb-input" type="password" placeholder="API Key (leave blank to use .env or env var)" />
-        <button class="rb-key-toggle" onclick="rbLabToggleKey()" title="Show/hide">👁</button>
-        <button class="rb-key-toggle" onclick="rbLabSaveKey()" title="Save to ~/.env">💾</button>
-      </div>
-      <div id="rb-status"></div>
-    </div>`;
-  document.body.appendChild(panel);
-
-  // Restore size and position
-  const savedW = localStorage.getItem('rb_panel_w');
-  const savedH = localStorage.getItem('rb_panel_h');
-  const savedL = localStorage.getItem('rb_panel_l');
-  const savedT = localStorage.getItem('rb_panel_t');
-  if (savedW) panel.style.width  = savedW;
-  if (savedH) panel.style.height = savedH;
-  if (savedL && savedT) {
-    panel.style.right  = 'auto'; panel.style.bottom = 'auto';
-    panel.style.left = savedL; panel.style.top = savedT;
+        <div class="rb-row" id="rb-agent-model-row">
+          <select id="rb-agent-sel" class="rb-select rb-select-agent" onchange="rbLabSwitchAgent(this.value)">
+            ${AGENT_IDS.map(id => `<option value="${id}">${AGENTS[id].label}</option>`).join('')}
+          </select>
+          <select id="rb-model-sel" class="rb-select"></select>
+          <button class="rb-key-toggle" onclick="rbLabTogglePrefs()" title="Edit model list">⚙</button>
+        </div>
+        <div id="rb-prefs" class="rb-hidden">
+          <textarea id="rb-models-input" placeholder="One model name per line…"></textarea>
+          <div class="rb-row" style="gap:6px">
+            <button id="rb-prefs-reset" onclick="rbLabResetPrefs()" style="flex:1">Reset</button>
+            <button id="rb-prefs-save"  onclick="rbLabSavePrefs()"  style="flex:2">Save</button>
+          </div>
+        </div>
+        <div class="rb-row" id="rb-key-row">
+          <input id="rb-key-input" class="rb-input" type="password" placeholder="API Key (leave blank to use .env)" />
+          <button class="rb-key-toggle" onclick="rbLabToggleKey()" title="Show/hide">👁</button>
+          <button class="rb-key-toggle" onclick="rbLabSaveKey()" title="Save to ~/.env">💾</button>
+        </div>
+        <div id="rb-status"></div>
+      </div>`;
   }
 
-  const ro = new ResizeObserver(() => {
-    if (panel.style.width)  localStorage.setItem('rb_panel_w', panel.style.width);
-    if (panel.style.height) localStorage.setItem('rb_panel_h', panel.style.height);
-  });
-  ro.observe(panel);
+  protected onAfterAttach(): void {
+    const agentSel = this.node.querySelector('#rb-agent-sel') as HTMLSelectElement;
+    agentSel.value = currentAgent;
 
-  // Init agent selector
-  const agentSel = document.getElementById('rb-agent-sel') as HTMLSelectElement;
-  agentSel.value = currentAgent;
+    rebuildModelSelect();
+    const sel = this.node.querySelector('#rb-model-sel') as HTMLSelectElement;
+    sel.onchange = () => localStorage.setItem(modelSelKey(currentAgent, currentTab), sel.value);
 
-  // Init model selector
-  rebuildModelSelect();
-  const sel = document.getElementById('rb-model-sel') as HTMLSelectElement;
-  sel.onchange = () => localStorage.setItem(modelSelKey(currentAgent, currentTab), sel.value);
-
-  document.getElementById('rb-close')!.onclick = () => {
-    panel.classList.add('rb-hidden');
-    toggle.style.display = 'flex';
-  };
-
-  // Drag
-  let dragging = false, ox = 0, oy = 0;
-  document.getElementById('rb-header')!.addEventListener('mousedown', (e: MouseEvent) => {
-    dragging = true; ox = e.clientX - panel.offsetLeft; oy = e.clientY - panel.offsetTop;
-  });
-
-  // Resize from top-left
-  let resizing = false, startX = 0, startY = 0, startW = 0, startH = 0, startR = 0, startB = 0;
-  document.getElementById('rb-resize-handle')!.addEventListener('mousedown', (e: MouseEvent) => {
-    e.stopPropagation();
-    resizing = true;
-    startX = e.clientX; startY = e.clientY;
-    startW = panel.offsetWidth; startH = panel.offsetHeight;
-    const rect = panel.getBoundingClientRect();
-    startR = window.innerWidth  - rect.right;
-    startB = window.innerHeight - rect.bottom;
-    panel.style.right  = startR + 'px'; panel.style.bottom = startB + 'px';
-    panel.style.left   = 'auto';        panel.style.top    = 'auto';
-  });
-
-  document.addEventListener('mousemove', (e: MouseEvent) => {
-    if (dragging) {
-      panel.style.right  = 'auto'; panel.style.bottom = 'auto';
-      panel.style.left = Math.max(0, Math.min(window.innerWidth  - panel.offsetWidth,  e.clientX - ox)) + 'px';
-      panel.style.top  = Math.max(0, Math.min(window.innerHeight - panel.offsetHeight, e.clientY - oy)) + 'px';
-      localStorage.setItem('rb_panel_l', panel.style.left);
-      localStorage.setItem('rb_panel_t', panel.style.top);
-    }
-    if (resizing) {
-      const newW = Math.max(240, startW - (e.clientX - startX));
-      const newH = Math.max(220, startH - (e.clientY - startY));
-      panel.style.width  = newW + 'px';
-      panel.style.height = newH + 'px';
-      localStorage.setItem('rb_panel_w', panel.style.width);
-      localStorage.setItem('rb_panel_h', panel.style.height);
-    }
-  });
-  document.addEventListener('mouseup', () => { dragging = false; resizing = false; });
-
-  renderTabContent('input');
+    renderTabContent('input');
+  }
 }
 
 // ── Expose to HTML onclick ────────────────────────────────────────────────────
@@ -676,12 +577,13 @@ function buildPanel(): void {
 
 const plugin: JupyterFrontEndPlugin<void> = {
   id: 'rb-assistant-lab:plugin',
-  description: 'AI voice assistant panel',
+  description: 'AI voice assistant sidebar panel',
   autoStart: true,
   requires: [INotebookTracker],
   activate: (app: JupyterFrontEnd, nbTracker: INotebookTracker) => {
     tracker = nbTracker;
-    app.restored.then(() => { buildPanel(); });
+    const widget = new AIAssistantWidget();
+    app.shell.add(widget, 'left', { rank: 500 });
   }
 };
 

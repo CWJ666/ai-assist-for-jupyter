@@ -64,7 +64,7 @@ define(['base/js/namespace'], function (Jupyter) {
   var mediaRecorder = null;
   var audioChunks = [];
   var isRecording = false;
-  var currentTab = 'code';
+  var currentTab = 'input';
   var currentAgent = localStorage.getItem('rb_agent') || 'openai';
 
   // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -372,18 +372,19 @@ define(['base/js/namespace'], function (Jupyter) {
     });
   };
 
-  window.rbAction = function () {
+  window.rbAction = function (mode) {
     var voiceBox = document.getElementById('rb-voice-text');
     var text = voiceBox ? voiceBox.value.trim() : '';
     if (!text) { setStatus('Please record or type something first.', true); return; }
 
-    var actionBtn = document.getElementById('rb-action-btn');
+    var btnId = mode === 'code' ? 'rb-code-btn' : 'rb-polish-btn';
+    var actionBtn = document.getElementById(btnId);
     if (actionBtn) actionBtn.disabled = true;
 
     getApiKey().then(function (apiKey) {
       setStatus('Generating…');
       var model = getModel();
-      if (currentTab === 'code') {
+      if (mode === 'code') {
         return chatComplete(PROMPT_CODE, [{ role: 'user', content: text }], model, apiKey).then(function (code) {
           code = code.replace(/^```(?:python)?\s*/m, '').replace(/\s*```$/m, '').trim();
           insertCodeCell(code);
@@ -479,13 +480,16 @@ define(['base/js/namespace'], function (Jupyter) {
     var body = document.getElementById('rb-body');
     if (!statusEl || !body) return;
 
-    if (tab === 'code' || tab === 'polish') {
+    if (tab === 'input') {
       var area = document.createElement('div');
       area.id = 'rb-action-area';
       area.innerHTML = [
         '<button id="rb-voice-btn" onclick="rbVoiceRecord()">🎤 Record</button>',
         '<textarea id="rb-voice-text" placeholder="Transcription result, or type directly…"></textarea>',
-        '<button id="rb-action-btn" onclick="rbAction()">' + (tab === 'code' ? 'Generate Code' : 'Polish Notes') + '</button>',
+        '<div class="rb-btn-row">',
+        '  <button id="rb-code-btn"   onclick="rbAction(\'code\')">Generate Code</button>',
+        '  <button id="rb-polish-btn" onclick="rbAction(\'polish\')">Polish Notes</button>',
+        '</div>',
       ].join('');
       body.insertBefore(area, statusEl);
     } else {
@@ -515,7 +519,7 @@ define(['base/js/namespace'], function (Jupyter) {
     if (sel) localStorage.setItem(modelSelKey(currentAgent, currentTab), sel.value);
 
     currentTab = tab;
-    ['code', 'polish', 'chat'].forEach(function (t) {
+    ['input', 'chat'].forEach(function (t) {
       var btn = document.getElementById('rb-tab-' + t);
       if (btn) btn.classList.toggle('active', t === tab);
     });
@@ -556,10 +560,12 @@ define(['base/js/namespace'], function (Jupyter) {
       '.rb-input::placeholder{color:#585b70}',
       '.rb-key-toggle{background:none;border:none;color:#6c7086;cursor:pointer;font-size:15px;padding:0 2px;flex-shrink:0}',
       '.rb-key-toggle:hover{color:#cdd6f4}',
-      '#rb-voice-btn,#rb-action-btn{width:100%;padding:8px;border:none;border-radius:7px;color:#fff;font-size:13px;font-family:inherit;cursor:pointer;transition:background .15s}',
-      '#rb-voice-btn{background:#45475a}#rb-voice-btn:hover{background:#585b70}#rb-voice-btn.recording{background:#dc2626}',
-      '#rb-voice-btn:disabled,#rb-action-btn:disabled{opacity:.5;cursor:default}',
-      '#rb-action-btn{background:#7c3aed}#rb-action-btn:hover{background:#6d28d9}',
+      '#rb-voice-btn{width:100%;padding:8px;border:none;border-radius:7px;color:#fff;font-size:13px;font-family:inherit;cursor:pointer;transition:background .15s;background:#45475a}',
+      '#rb-voice-btn:hover{background:#585b70}#rb-voice-btn.recording{background:#dc2626}#rb-voice-btn:disabled{opacity:.5;cursor:default}',
+      '.rb-btn-row{display:flex;gap:6px}',
+      '.rb-btn-row button{flex:1;padding:8px 4px;border:none;border-radius:7px;background:#7c3aed;color:#fff;font-size:12px;font-family:inherit;cursor:pointer;transition:background .15s}',
+      '.rb-btn-row button:hover{background:#6d28d9}.rb-btn-row button:disabled{opacity:.5;cursor:default}',
+      '.rb-select-agent{flex:0 0 auto;max-width:110px}',
       '#rb-status{font-size:11px;color:#a6adc8;min-height:16px;text-align:center}',
       '#rb-status.error{color:#f38ba8}',
       '#rb-chat-messages{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding:2px 0;min-height:0}',
@@ -603,21 +609,17 @@ define(['base/js/namespace'], function (Jupyter) {
 
     var panel = document.createElement('div');
     panel.id = 'rb-panel';
+    panel.classList.add('rb-hidden');
     panel.innerHTML = [
       '<div id="rb-resize-handle" title="Resize"></div>',
       '<div id="rb-header"><span>🤖 AI Assistant</span><button id="rb-close" title="Close">✕</button></div>',
       '<div id="rb-body">',
       '  <div id="rb-tabs">',
-      '    <button id="rb-tab-code"   class="rb-tab active" onclick="rbTab(\'code\')">Code</button>',
-      '    <button id="rb-tab-polish" class="rb-tab"        onclick="rbTab(\'polish\')">Polish</button>',
-      '    <button id="rb-tab-chat"   class="rb-tab"        onclick="rbTab(\'chat\')">Chat</button>',
+      '    <button id="rb-tab-input" class="rb-tab active" onclick="rbTab(\'input\')">Input</button>',
+      '    <button id="rb-tab-chat"  class="rb-tab"        onclick="rbTab(\'chat\')">Chat</button>',
       '  </div>',
-      '  <div class="rb-row" id="rb-agent-row">',
-      '    <label class="rb-label">Agent</label>',
-      '    <select id="rb-agent-sel" class="rb-select" onchange="rbSwitchAgent(this.value)">' + agentOptions + '</select>',
-      '  </div>',
-      '  <div class="rb-row" id="rb-model-row">',
-      '    <label class="rb-label">Model</label>',
+      '  <div class="rb-row" id="rb-agent-model-row">',
+      '    <select id="rb-agent-sel" class="rb-select rb-select-agent" onchange="rbSwitchAgent(this.value)">' + agentOptions + '</select>',
       '    <select id="rb-model-sel" class="rb-select"></select>',
       '    <button class="rb-key-toggle" onclick="rbTogglePrefs()" title="Edit model list">⚙</button>',
       '  </div>',
@@ -710,7 +712,7 @@ define(['base/js/namespace'], function (Jupyter) {
     });
     document.addEventListener('mouseup', function () { dragging = false; resizing = false; });
 
-    renderTabContent('code');
+    renderTabContent('input');
   }
 
   // ── Extension entry point ────────────────────────────────────────────────────

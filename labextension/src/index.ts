@@ -65,7 +65,7 @@ let chatHistory: { role: string; content: string }[] = [];
 let mediaRecorder: MediaRecorder | null = null;
 let audioChunks: Blob[] = [];
 let isRecording = false;
-let currentTab = 'code';
+let currentTab = 'input';
 let currentAgent: AgentId = (localStorage.getItem('rb_agent') as AgentId) || 'openai';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -371,12 +371,13 @@ async function handleVoiceRecord(): Promise<void> {
   }
 }
 
-async function handleAction(): Promise<void> {
+async function handleAction(mode: 'code' | 'polish'): Promise<void> {
   const voiceBox = document.getElementById('rb-voice-text') as HTMLTextAreaElement | null;
   const text = voiceBox?.value.trim() || '';
   if (!text) { setStatus('Please record or type something first.', true); return; }
 
-  const actionBtn = document.getElementById('rb-action-btn') as HTMLButtonElement | null;
+  const btnId = mode === 'code' ? 'rb-code-btn' : 'rb-polish-btn';
+  const actionBtn = document.getElementById(btnId) as HTMLButtonElement | null;
   if (actionBtn) actionBtn.disabled = true;
 
   let apiKey: string;
@@ -386,7 +387,7 @@ async function handleAction(): Promise<void> {
   try {
     setStatus('Generating…');
     const model = getModel();
-    if (currentTab === 'code') {
+    if (mode === 'code') {
       let code = await chatComplete(PROMPT_CODE, [{ role: 'user', content: text }], model, apiKey);
       code = code.replace(/^```(?:python)?\s*/m, '').replace(/\s*```$/m, '').trim();
       insertCodeCell(code);
@@ -476,14 +477,16 @@ function renderTabContent(tab: string): void {
   const statusEl = document.getElementById('rb-status')!;
   const body = document.getElementById('rb-body')!;
 
-  if (tab === 'code' || tab === 'polish') {
+  if (tab === 'input') {
     const area = document.createElement('div');
     area.id = 'rb-action-area';
-    const actionLabel = tab === 'code' ? 'Generate Code' : 'Polish Notes';
     area.innerHTML = `
       <button id="rb-voice-btn" onclick="rbLabVoiceRecord()">🎤 Record</button>
       <textarea id="rb-voice-text" placeholder="Transcription result, or type directly…"></textarea>
-      <button id="rb-action-btn" onclick="rbLabAction()">${actionLabel}</button>`;
+      <div class="rb-btn-row">
+        <button id="rb-code-btn"   onclick="rbLabAction('code')">Generate Code</button>
+        <button id="rb-polish-btn" onclick="rbLabAction('polish')">Polish Notes</button>
+      </div>`;
     body.insertBefore(area, statusEl);
   } else {
     const area = document.createElement('div');
@@ -509,7 +512,7 @@ function switchTab(tab: string): void {
   if (sel) localStorage.setItem(modelSelKey(currentAgent, currentTab), sel.value);
 
   currentTab = tab;
-  ['code', 'polish', 'chat'].forEach(t => {
+  ['input', 'chat'].forEach(t => {
     document.getElementById('rb-tab-' + t)?.classList.toggle('active', t === tab);
   });
   renderTabContent(tab);
@@ -543,6 +546,7 @@ function buildPanel(): void {
 
   const panel = document.createElement('div');
   panel.id = 'rb-panel';
+  panel.classList.add('rb-hidden');
   panel.innerHTML = `
     <div id="rb-resize-handle" title="Resize"></div>
     <div id="rb-header">
@@ -551,18 +555,13 @@ function buildPanel(): void {
     </div>
     <div id="rb-body">
       <div id="rb-tabs">
-        <button id="rb-tab-code"   class="rb-tab active" onclick="rbLabTab('code')">Code</button>
-        <button id="rb-tab-polish" class="rb-tab"        onclick="rbLabTab('polish')">Polish</button>
-        <button id="rb-tab-chat"   class="rb-tab"        onclick="rbLabTab('chat')">Chat</button>
+        <button id="rb-tab-input" class="rb-tab active" onclick="rbLabTab('input')">Input</button>
+        <button id="rb-tab-chat"  class="rb-tab"        onclick="rbLabTab('chat')">Chat</button>
       </div>
-      <div class="rb-row" id="rb-agent-row">
-        <label class="rb-label">Agent</label>
-        <select id="rb-agent-sel" class="rb-select" onchange="rbLabSwitchAgent(this.value)">
+      <div class="rb-row" id="rb-agent-model-row">
+        <select id="rb-agent-sel" class="rb-select rb-select-agent" onchange="rbLabSwitchAgent(this.value)">
           ${AGENT_IDS.map(id => `<option value="${id}">${AGENTS[id].label}</option>`).join('')}
         </select>
-      </div>
-      <div class="rb-row" id="rb-model-row">
-        <label class="rb-label">Model</label>
         <select id="rb-model-sel" class="rb-select"></select>
         <button class="rb-key-toggle" onclick="rbLabTogglePrefs()" title="Edit model list">⚙</button>
       </div>
@@ -653,7 +652,7 @@ function buildPanel(): void {
   });
   document.addEventListener('mouseup', () => { dragging = false; resizing = false; });
 
-  renderTabContent('code');
+  renderTabContent('input');
 }
 
 // ── Expose to HTML onclick ────────────────────────────────────────────────────
@@ -661,7 +660,7 @@ function buildPanel(): void {
 (window as any).rbLabTab          = switchTab;
 (window as any).rbLabSwitchAgent  = (id: string) => switchAgent(id as AgentId);
 (window as any).rbLabVoiceRecord  = handleVoiceRecord;
-(window as any).rbLabAction       = handleAction;
+(window as any).rbLabAction       = (mode: string) => handleAction(mode as 'code' | 'polish');
 (window as any).rbLabChatVoice    = handleChatVoice;
 (window as any).rbLabChatSend     = () => sendChat((document.getElementById('rb-chat-input') as HTMLTextAreaElement | null)?.value || '');
 (window as any).rbLabTogglePrefs  = togglePrefs;

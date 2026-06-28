@@ -49,13 +49,15 @@
 .rb-key-toggle { background: none; border: none; color: #6c7086; cursor: pointer; font-size: 15px; padding: 0 2px; flex-shrink: 0; }
 .rb-key-toggle:hover { color: #cdd6f4; }
 
-#rb-voice-btn, #rb-action-btn { width: 100%; padding: 8px; border: none; border-radius: 7px; color: #fff; font-size: 13px; font-family: inherit; cursor: pointer; transition: background .15s; }
-#rb-voice-btn { background: #45475a; }
+#rb-voice-btn { width: 100%; padding: 8px; border: none; border-radius: 7px; color: #fff; font-size: 13px; font-family: inherit; cursor: pointer; transition: background .15s; background: #45475a; }
 #rb-voice-btn:hover { background: #585b70; }
 #rb-voice-btn.recording { background: #dc2626; }
-#rb-voice-btn:disabled, #rb-action-btn:disabled { opacity: .5; cursor: default; }
-#rb-action-btn { background: #7c3aed; }
-#rb-action-btn:hover { background: #6d28d9; }
+#rb-voice-btn:disabled { opacity: .5; cursor: default; }
+.rb-btn-row { display: flex; gap: 6px; }
+.rb-btn-row button { flex: 1; padding: 8px 4px; border: none; border-radius: 7px; background: #7c3aed; color: #fff; font-size: 12px; font-family: inherit; cursor: pointer; transition: background .15s; }
+.rb-btn-row button:hover { background: #6d28d9; }
+.rb-btn-row button:disabled { opacity: .5; cursor: default; }
+.rb-select-agent { flex: 0 0 auto; max-width: 110px; }
 
 #rb-status { font-size: 11px; color: #a6adc8; min-height: 16px; text-align: center; }
 #rb-status.error { color: #f38ba8; }

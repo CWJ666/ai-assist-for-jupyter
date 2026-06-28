@@ -40,7 +40,7 @@
     "outputDir": "rb_assistant_lab/labextension",
     "schemaDir": "schema",
     "_build": {
-      "load": "static/remoteEntry.2347731af6b413f7871f.js",
+      "load": "static/remoteEntry.56262f5a2f30133a8b17.js",
       "extension": "./extension",
       "style": "./style"
     }

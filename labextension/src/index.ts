@@ -79,18 +79,18 @@ async function getApiKey(): Promise<string> {
         resolve(text);
       }
     };
-    setTimeout(() => { if (!done) reject(new Error('未找到 API Key，请在面板中填入')); }, 5000);
+    setTimeout(() => { if (!done) reject(new Error('API Key not found. Please enter it in the panel.')); }, 5000);
   });
 }
 
 function saveApiKey(): void {
   const inp = document.getElementById('rb-key-input') as HTMLInputElement | null;
-  if (!inp?.value.trim()) { setStatus('请先填入 API Key', true); return; }
+  if (!inp?.value.trim()) { setStatus('Please enter your API Key first.', true); return; }
   const key = inp.value.trim();
   localStorage.setItem('rb_openai_key', key);
 
   const kernel = tracker.currentWidget?.sessionContext.session?.kernel;
-  if (!kernel) { setStatus('✓ 已保存到浏览器（无活跃 kernel）'); return; }
+  if (!kernel) { setStatus('✓ Saved to browser (no active kernel)'); return; }
 
   const code = [
     "from pathlib import Path",
@@ -103,7 +103,7 @@ function saveApiKey(): void {
 
   const future = kernel.requestExecute({ code });
   future.onIOPub = (msg: any) => {
-    if ((msg.content?.text || '').trim() === 'saved') setStatus('✓ API Key 已保存到 ~/.env');
+    if ((msg.content?.text || '').trim() === 'saved') setStatus('✓ API Key saved to ~/.env');
   };
 }
 
@@ -169,7 +169,7 @@ function insertMarkdownCell(bullets: string): void {
 async function startRecording(onStop: (blob: Blob, ext: string) => Promise<void>): Promise<void> {
   let stream: MediaStream;
   try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
-  catch { throw new Error('麦克风权限被拒绝'); }
+  catch { throw new Error('Microphone access denied'); }
 
   const mime = ['audio/webm', 'audio/mp4', 'audio/ogg'].find(t => MediaRecorder.isTypeSupported(t)) || '';
   audioChunks = [];
@@ -217,29 +217,29 @@ async function handleVoiceRecord(): Promise<void> {
 
   const btn = document.getElementById('rb-voice-btn') as HTMLButtonElement | null;
   if (!btn) return;
-  btn.textContent = '⏹ 停止录音';
+  btn.textContent = '⏹ Stop';
   btn.classList.add('recording');
-  setStatus('录音中… 说完后点停止');
+  setStatus('Recording… click Stop when done');
 
   try {
     await startRecording(async (blob, ext) => {
-      btn.textContent = '🎤 录音';
+      btn.textContent = '🎤 Record';
       btn.classList.remove('recording');
       btn.disabled = true;
       try {
-        setStatus('语音识别中…');
+        setStatus('Transcribing…');
         const text = await transcribe(blob, ext, apiKey);
-        if (!text) throw new Error('未识别到语音');
+        if (!text) throw new Error('No speech detected');
         const voiceBox = document.getElementById('rb-voice-text') as HTMLTextAreaElement | null;
         if (voiceBox) voiceBox.value = text;
-        setStatus('✓ 识别完成，可编辑后点下方按钮执行');
+        setStatus('✓ Done. Edit if needed, then click the button below.');
       } catch (e: any) {
         setStatus('❌ ' + e.message, true);
       }
       btn.disabled = false;
     });
   } catch (e: any) {
-    btn.textContent = '🎤 录音';
+    btn.textContent = '🎤 Record';
     btn.classList.remove('recording');
     setStatus('❌ ' + e.message, true);
   }
@@ -248,7 +248,7 @@ async function handleVoiceRecord(): Promise<void> {
 async function handleAction(): Promise<void> {
   const voiceBox = document.getElementById('rb-voice-text') as HTMLTextAreaElement | null;
   const text = voiceBox?.value.trim() || '';
-  if (!text) { setStatus('请先录音或在文本框中输入内容', true); return; }
+  if (!text) { setStatus('Please record or type something first.', true); return; }
 
   const actionBtn = document.getElementById('rb-action-btn') as HTMLButtonElement | null;
   if (actionBtn) actionBtn.disabled = true;
@@ -258,17 +258,17 @@ async function handleAction(): Promise<void> {
   catch (e: any) { setStatus('❌ ' + e.message, true); if (actionBtn) actionBtn.disabled = false; return; }
 
   try {
-    setStatus('生成中…');
+    setStatus('Generating…');
     const model = getModel();
     if (currentTab === 'code') {
       let code = await chatComplete(PROMPT_CODE, [{ role: 'user', content: text }], model, apiKey);
       code = code.replace(/^```(?:python)?\s*/m, '').replace(/\s*```$/m, '').trim();
       insertCodeCell(code);
-      setStatus('✓ 代码已插入到选中 cell 下方');
+      setStatus('✓ Code inserted below active cell');
     } else {
       const bullets = await chatComplete(PROMPT_POLISH, [{ role: 'user', content: text }], model, apiKey);
       insertMarkdownCell(bullets);
-      setStatus('✓ 笔记已插入（双列）');
+      setStatus('✓ Notes inserted (two-column layout)');
     }
   } catch (e: any) {
     setStatus('❌ ' + e.message, true);
@@ -286,13 +286,13 @@ async function handleChatVoice(): Promise<void> {
   catch (e: any) { setStatus('❌ ' + e.message, true); return; }
 
   btn.classList.add('recording');
-  setStatus('录音中…');
+  setStatus('Recording…');
 
   try {
     await startRecording(async (blob, ext) => {
       btn.classList.remove('recording');
       try {
-        setStatus('语音识别中…');
+        setStatus('Transcribing…');
         const text = await transcribe(blob, ext, apiKey);
         if (text) await sendChat(text);
       } catch (e: any) {
@@ -326,7 +326,7 @@ async function sendChat(text: string): Promise<void> {
   chatHistory.push({ role: 'user', content: text });
   const input = document.getElementById('rb-chat-input') as HTMLTextAreaElement | null;
   if (input) input.value = '';
-  setStatus('AI 回复中…');
+  setStatus('Thinking…');
 
   let apiKey: string;
   try { apiKey = await getApiKey(); }
@@ -352,10 +352,10 @@ function renderTabContent(tab: string): void {
   if (tab === 'code' || tab === 'polish') {
     const area = document.createElement('div');
     area.id = 'rb-action-area';
-    const actionLabel = tab === 'code' ? '生成代码' : '整理笔记';
+    const actionLabel = tab === 'code' ? 'Generate Code' : 'Polish Notes';
     area.innerHTML = `
-      <button id="rb-voice-btn" onclick="rbLabVoiceRecord()">🎤 录音</button>
-      <textarea id="rb-voice-text" placeholder="语音识别结果，也可直接输入…"></textarea>
+      <button id="rb-voice-btn" onclick="rbLabVoiceRecord()">🎤 Record</button>
+      <textarea id="rb-voice-text" placeholder="Transcription result, or type directly…"></textarea>
       <button id="rb-action-btn" onclick="rbLabAction()">${actionLabel}</button>`;
     body.insertBefore(area, statusEl);
   } else {
@@ -364,8 +364,8 @@ function renderTabContent(tab: string): void {
     area.innerHTML = `
       <div id="rb-chat-messages"></div>
       <div id="rb-chat-row">
-        <textarea id="rb-chat-input" placeholder="输入消息…" rows="1"></textarea>
-        <button id="rb-chat-voice" title="语音输入" onclick="rbLabChatVoice()">🎤</button>
+        <textarea id="rb-chat-input" placeholder="Type a message…" rows="1"></textarea>
+        <button id="rb-chat-voice" title="Voice input" onclick="rbLabChatVoice()">🎤</button>
         <button id="rb-chat-send" onclick="rbLabChatSend()">↑</button>
       </div>`;
     body.insertBefore(area, statusEl);
@@ -418,16 +418,16 @@ function buildPanel(): void {
   const panel = document.createElement('div');
   panel.id = 'rb-panel';
   panel.innerHTML = `
-    <div id="rb-resize-handle" title="调节大小"></div>
+    <div id="rb-resize-handle" title="Resize"></div>
     <div id="rb-header">
       <span>🤖 AI Assistant</span>
-      <button id="rb-close" title="关闭">✕</button>
+      <button id="rb-close" title="Close">✕</button>
     </div>
     <div id="rb-body">
       <div id="rb-tabs">
-        <button id="rb-tab-code"   class="rb-tab active" onclick="rbLabTab('code')">生成代码</button>
-        <button id="rb-tab-polish" class="rb-tab"        onclick="rbLabTab('polish')">整理笔记</button>
-        <button id="rb-tab-chat"   class="rb-tab"        onclick="rbLabTab('chat')">讨论</button>
+        <button id="rb-tab-code"   class="rb-tab active" onclick="rbLabTab('code')">Code</button>
+        <button id="rb-tab-polish" class="rb-tab"        onclick="rbLabTab('polish')">Polish</button>
+        <button id="rb-tab-chat"   class="rb-tab"        onclick="rbLabTab('chat')">Chat</button>
       </div>
       <div class="rb-row" id="rb-model-row">
         <select id="rb-model-sel" class="rb-select">
@@ -435,9 +435,9 @@ function buildPanel(): void {
         </select>
       </div>
       <div class="rb-row" id="rb-key-row">
-        <input id="rb-key-input" class="rb-input" type="password" placeholder="API Key（留空则读 .env / 环境变量）" />
-        <button class="rb-key-toggle" onclick="rbLabToggleKey()" title="显示/隐藏">👁</button>
-        <button class="rb-key-toggle" onclick="rbLabSaveKey()" title="保存到 ~/.env">💾</button>
+        <input id="rb-key-input" class="rb-input" type="password" placeholder="API Key (leave blank to use .env or env var)" />
+        <button class="rb-key-toggle" onclick="rbLabToggleKey()" title="Show/hide">👁</button>
+        <button class="rb-key-toggle" onclick="rbLabSaveKey()" title="Save to ~/.env">💾</button>
       </div>
       <div id="rb-status"></div>
     </div>`;

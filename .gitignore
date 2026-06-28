@@ -1,0 +1,22 @@
+# Node
+**/node_modules/
+**/.yarn/cache/
+**/.yarn/install-state.gz
+
+# Build output
+labextension/lib/
+labextension/tsconfig.tsbuildinfo
+labextension/rb_assistant_lab/labextension/static/
+**/*.egg-info/
+
+# Python
+**/__pycache__/
+*.py[cod]
+dist/
+build/
+.eggs/
+
+# Editor / tools
+.claude/
+.DS_Store
+*.swp

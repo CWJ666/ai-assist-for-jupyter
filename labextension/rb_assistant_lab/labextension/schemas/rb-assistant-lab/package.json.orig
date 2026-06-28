@@ -1,0 +1,43 @@
+{
+  "name": "rb-assistant-lab",
+  "version": "0.1.0",
+  "description": "AI voice assistant for JupyterLab",
+  "keywords": [
+    "jupyter",
+    "jupyterlab",
+    "jupyterlab-extension"
+  ],
+  "license": "MIT",
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
+  "style": "style/index.css",
+  "scripts": {
+    "build": "jlpm build:lib && jlpm build:labextension:dev",
+    "build:prod": "jlpm clean && jlpm build:lib && jlpm build:labextension",
+    "build:lib": "tsc -p tsconfig.json",
+    "build:labextension": "jupyter labextension build .",
+    "build:labextension:dev": "jupyter labextension build --development True .",
+    "clean": "jlpm clean:lib && jlpm clean:labextension",
+    "clean:lib": "rimraf lib tsconfig.tsbuildinfo",
+    "clean:labextension": "rimraf rb_assistant_lab/labextension",
+    "watch": "run-p watch:src watch:lab",
+    "watch:src": "tsc -w",
+    "watch:lab": "jupyter labextension watch ."
+  },
+  "dependencies": {
+    "@jupyterlab/application": "^4.0.0",
+    "@jupyterlab/apputils": "^4.0.0",
+    "@jupyterlab/notebook": "^4.0.0"
+  },
+  "devDependencies": {
+    "@jupyterlab/builder": "^4.0.0",
+    "npm-run-all": "^4.1.5",
+    "rimraf": "^5.0.1",
+    "typescript": "~5.0.2"
+  },
+  "jupyterlab": {
+    "extension": true,
+    "outputDir": "rb_assistant_lab/labextension",
+    "schemaDir": "schema"
+  }
+}

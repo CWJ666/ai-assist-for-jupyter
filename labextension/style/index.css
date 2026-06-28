@@ -1,0 +1,80 @@
+/* Same panel styles shared with classic version */
+#rb-toggle {
+  position: fixed; bottom: 24px; right: 24px;
+  width: 44px; height: 44px; border-radius: 50%;
+  border: none; background: #7c3aed; color: #fff;
+  font-size: 20px; cursor: pointer; z-index: 9999;
+  box-shadow: 0 4px 16px rgba(0,0,0,.35);
+  display: flex; align-items: center; justify-content: center;
+  transition: background .15s;
+}
+#rb-toggle:hover { background: #6d28d9; }
+
+#rb-panel {
+  position: fixed; bottom: 78px; right: 24px; width: 300px; height: 420px;
+  background: #1e1e2e; border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0,0,0,.45);
+  display: flex; flex-direction: column;
+  z-index: 9998; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #cdd6f4; font-size: 13px; overflow: hidden;
+  min-width: 240px; min-height: 220px;
+}
+#rb-resize-handle {
+  position: absolute; top: 0; left: 0; width: 16px; height: 16px;
+  cursor: nw-resize; z-index: 10;
+  background: linear-gradient(135deg, #45475a 25%, transparent 25%) no-repeat 3px 3px / 10px 10px;
+  border-radius: 12px 0 0 0;
+}
+#rb-panel.rb-hidden { display: none !important; }
+
+#rb-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px; background: #181825; cursor: move;
+  user-select: none; border-bottom: 1px solid #313244;
+}
+#rb-header span { font-weight: 600; font-size: 13px; }
+#rb-close { background: none; border: none; color: #6c7086; cursor: pointer; font-size: 14px; padding: 0 2px; }
+#rb-close:hover { color: #cdd6f4; }
+
+#rb-body { padding: 12px; display: flex; flex-direction: column; gap: 10px; flex: 1; overflow-y: auto; min-height: 0; }
+
+#rb-tabs { display: flex; gap: 4px; background: #181825; border-radius: 7px; padding: 3px; }
+.rb-tab { flex: 1; padding: 5px 0; border: none; border-radius: 5px; background: none; color: #6c7086; cursor: pointer; font-size: 12px; font-family: inherit; transition: background .12s, color .12s; }
+.rb-tab.active { background: #313244; color: #cdd6f4; }
+
+.rb-row { display: flex; gap: 6px; align-items: center; }
+.rb-select, .rb-input { flex: 1; padding: 5px 8px; border-radius: 6px; border: 1px solid #45475a; background: #313244; color: #cdd6f4; font-size: 12px; font-family: inherit; outline: none; min-width: 0; }
+.rb-select:focus, .rb-input:focus { border-color: #7c3aed; }
+.rb-input::placeholder { color: #585b70; }
+.rb-key-toggle { background: none; border: none; color: #6c7086; cursor: pointer; font-size: 15px; padding: 0 2px; flex-shrink: 0; }
+.rb-key-toggle:hover { color: #cdd6f4; }
+
+#rb-voice-btn, #rb-action-btn { width: 100%; padding: 8px; border: none; border-radius: 7px; color: #fff; font-size: 13px; font-family: inherit; cursor: pointer; transition: background .15s; }
+#rb-voice-btn { background: #45475a; }
+#rb-voice-btn:hover { background: #585b70; }
+#rb-voice-btn.recording { background: #dc2626; }
+#rb-voice-btn:disabled, #rb-action-btn:disabled { opacity: .5; cursor: default; }
+#rb-action-btn { background: #7c3aed; }
+#rb-action-btn:hover { background: #6d28d9; }
+
+#rb-status { font-size: 11px; color: #a6adc8; min-height: 16px; text-align: center; }
+#rb-status.error { color: #f38ba8; }
+
+#rb-chat-messages { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding: 2px 0; min-height: 0; }
+.rb-msg { display: flex; flex-direction: column; gap: 2px; }
+.rb-bubble { padding: 7px 10px; border-radius: 8px; font-size: 12px; line-height: 1.5; max-width: 90%; word-break: break-word; white-space: pre-wrap; }
+.rb-bubble.user { background: #7c3aed; color: #fff; align-self: flex-end; border-radius: 8px 8px 2px 8px; }
+.rb-bubble.ai   { background: #313244; color: #cdd6f4; align-self: flex-start; border-radius: 8px 8px 8px 2px; }
+
+#rb-chat-row { display: flex; gap: 6px; align-items: flex-end; }
+#rb-chat-input { flex: 1; padding: 6px 9px; border-radius: 6px; border: 1px solid #45475a; background: #313244; color: #cdd6f4; font-size: 12px; font-family: inherit; outline: none; resize: none; min-height: 32px; max-height: 80px; }
+#rb-chat-input:focus { border-color: #7c3aed; }
+#rb-chat-send, #rb-chat-voice { padding: 6px 10px; border: none; border-radius: 6px; background: #7c3aed; color: #fff; cursor: pointer; font-size: 13px; flex-shrink: 0; transition: background .15s; }
+#rb-chat-send:hover, #rb-chat-voice:hover { background: #6d28d9; }
+#rb-chat-voice.recording { background: #dc2626; }
+
+#rb-action-area { display: flex; flex-direction: column; gap: 8px; flex: 1; min-height: 0; }
+#rb-chat-area { display: flex; flex-direction: column; gap: 8px; flex: 1; min-height: 0; }
+#rb-voice-text { width: 100%; box-sizing: border-box; min-height: 60px; max-height: 200px; padding: 6px 9px; border-radius: 6px; border: 1px solid #45475a; background: #313244; color: #cdd6f4; font-size: 12px; font-family: inherit; outline: none; resize: vertical; line-height: 1.5; }
+#rb-voice-text:focus { border-color: #7c3aed; }
+#rb-voice-text::placeholder { color: #585b70; }

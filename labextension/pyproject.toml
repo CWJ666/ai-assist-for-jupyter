@@ -1,0 +1,21 @@
+[build-system]
+requires = ["jupyter_packaging>=0.12,<3", "setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ai-assist-for-jupyter"
+version = "0.1.0"
+description = "AI voice assistant for JupyterLab"
+license = { text = "MIT" }
+requires-python = ">=3.8"
+dependencies = ["jupyterlab>=4.0,<5"]
+
+[tool.jupyter-packaging.options]
+skip-if-exists = ["rb_assistant_lab/labextension/static"]
+ensured-targets = ["rb_assistant_lab/labextension/static/style.js"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+
+[tool.setuptools.package-data]
+"rb_assistant_lab" = ["labextension/**/*"]

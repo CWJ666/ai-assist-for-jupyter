@@ -69,6 +69,12 @@ Rules:
 - Do not add information not present in the original notes
 - Return only the organized bullet points, no preamble`;
 
+const PROMPT_FIX = `You are a Python debugging assistant in a Jupyter notebook.
+The user will provide code that raised an error, along with the error message.
+Fix the code so it runs without errors.
+- Return ONLY the corrected Python code — no explanation, no markdown fences
+- Preserve the original intent of the code`;
+
 const PROMPT_CHAT = `You are a helpful data analysis assistant embedded in a Jupyter notebook.
 Help the user understand their data, answer questions, suggest next steps, and explain methods.
 Be concise and practical.`;
@@ -82,6 +88,23 @@ let audioChunks: Blob[] = [];
 let isRecording = false;
 let currentTab = 'input';
 let currentAgent: AgentId = (localStorage.getItem('rb_agent') as AgentId) || 'openai';
+
+function loadInputHistory(): string[] {
+  try { return JSON.parse(localStorage.getItem('rb_input_history') || '[]'); } catch { return []; }
+}
+function saveInputHistory(text: string): void {
+  const hist = loadInputHistory().filter((s: string) => s !== text);
+  hist.unshift(text);
+  localStorage.setItem('rb_input_history', JSON.stringify(hist.slice(0, 30)));
+  rebuildHistorySelect();
+}
+function rebuildHistorySelect(): void {
+  const sel = document.getElementById('rb-history-sel') as HTMLSelectElement | null;
+  if (!sel) return;
+  const hist = loadInputHistory();
+  sel.innerHTML = `<option value="">History…</option>` +
+    hist.map((s: string) => `<option value="${s.replace(/"/g, '&quot;')}">${s.length > 40 ? s.slice(0, 40) + '…' : s}</option>`).join('');
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -266,6 +289,18 @@ async function chatComplete(
     if (!r.ok) throw new Error('Anthropic: ' + await r.text());
     return ((await r.json()) as any).content[0].text.trim();
   }
+  if (cfg.format === 'openai' && currentAgent === 'openai' && model.includes('codex')) {
+    const input = messages.map(m => ({ role: m.role, content: m.content }));
+    const r = await fetch('https://api.openai.com/v1/responses', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model, instructions: systemPrompt, input }),
+    });
+    if (!r.ok) throw new Error(`${cfg.label}: ` + await r.text());
+    const data = (await r.json()) as any;
+    const msg = data.output?.find((o: any) => o.type === 'message');
+    return (msg?.content?.find((c: any) => c.type === 'output_text')?.text || '').trim();
+  }
   const r = await fetch(cfg.baseUrl + '/chat/completions', {
     method: 'POST',
     headers: { 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/json' },
@@ -348,7 +383,7 @@ async function handleVoiceRecord(): Promise<void> {
         const text = await transcribe(blob, ext, apiKey);
         if (!text) throw new Error('No speech detected');
         const voiceBox = document.getElementById('rb-voice-text') as HTMLTextAreaElement | null;
-        if (voiceBox) voiceBox.value = text;
+        if (voiceBox) voiceBox.value = voiceBox.value ? voiceBox.value + '\n' + text : text;
         setStatus('✓ Done. Edit if needed, then click a button below.');
       } catch (e: any) { setStatus('❌ ' + e.message, true); }
       btn.disabled = false;
@@ -380,14 +415,48 @@ async function handleAction(mode: 'code' | 'polish'): Promise<void> {
       let code = await chatComplete(PROMPT_CODE, [{ role: 'user', content: text }], model, apiKey);
       code = code.replace(/^```(?:python)?\s*/m, '').replace(/\s*```$/m, '').trim();
       insertCodeCell(code);
+      saveInputHistory(text);
+      if (voiceBox) voiceBox.value = '';
       setStatus('✓ Code inserted below active cell');
     } else {
       const bullets = await chatComplete(PROMPT_POLISH, [{ role: 'user', content: text }], model, apiKey);
       insertMarkdownCell(bullets);
+      saveInputHistory(text);
+      if (voiceBox) voiceBox.value = '';
       setStatus('✓ Notes inserted (two-column layout)');
     }
   } catch (e: any) { setStatus('❌ ' + e.message, true); }
   if (actionBtn) actionBtn.disabled = false;
+}
+
+async function handleFix(): Promise<void> {
+  const nb = tracker.currentWidget?.content;
+  if (!nb) { setStatus('No active notebook.', true); return; }
+  const cell = nb.activeCell;
+  if (!cell) { setStatus('No active cell.', true); return; }
+
+  const code = cell.model.sharedModel.getSource();
+  const outputs: any[] = (cell.model as any).outputs?.toJSON?.() || [];
+  const errorOut = outputs.find((o: any) => o.output_type === 'error');
+  if (!errorOut) { setStatus('No error found in active cell.', true); return; }
+
+  const errorText = `${errorOut.ename}: ${errorOut.evalue}\n${(errorOut.traceback || []).join('\n').replace(/\x1b\[[0-9;]*m/g, '')}`;
+  const prompt = `Code:\n\`\`\`python\n${code}\n\`\`\`\n\nError:\n${errorText}`;
+
+  const btn = document.getElementById('rb-fix-btn') as HTMLButtonElement | null;
+  if (btn) btn.disabled = true;
+  let apiKey: string;
+  try { apiKey = await getApiKey(); }
+  catch (e: any) { setStatus('❌ ' + e.message, true); if (btn) btn.disabled = false; return; }
+
+  try {
+    setStatus('Fixing…');
+    let fixed = await chatComplete(PROMPT_FIX, [{ role: 'user', content: prompt }], getModel(), apiKey);
+    fixed = fixed.replace(/^```(?:python)?\s*/m, '').replace(/\s*```$/m, '').trim();
+    insertCodeCell(fixed);
+    setStatus('✓ Fixed code inserted below');
+  } catch (e: any) { setStatus('❌ ' + e.message, true); }
+  if (btn) btn.disabled = false;
 }
 
 async function handleChatVoice(): Promise<void> {
@@ -461,12 +530,17 @@ function renderTabContent(tab: string): void {
     const area = document.createElement('div');
     area.id = 'rb-action-area';
     area.innerHTML = `
-      <button id="rb-voice-btn" onclick="rbLabVoiceRecord()">🎤 Record</button>
+      <div class="rb-row">
+        <button id="rb-voice-btn" style="flex:1" onclick="rbLabVoiceRecord()">🎤 Record</button>
+        <select id="rb-history-sel" class="rb-select" style="flex:1" onchange="rbLabHistoryPick(this.value)"><option value="">History…</option></select>
+      </div>
       <textarea id="rb-voice-text" placeholder="Transcription result, or type directly…"></textarea>
       <div class="rb-btn-row">
         <button id="rb-code-btn"   onclick="rbLabAction('code')">Generate Code</button>
         <button id="rb-polish-btn" onclick="rbLabAction('polish')">Polish Notes</button>
-      </div>`;
+      </div>
+      <button id="rb-fix-btn" onclick="rbLabFix()">🔧 Fix Error in Active Cell</button>`;
+    rebuildHistorySelect();
     body.insertBefore(area, statusEl);
   } else {
     const area = document.createElement('div');
@@ -559,6 +633,14 @@ class AIAssistantWidget extends Widget {
 // ── Expose to HTML onclick ────────────────────────────────────────────────────
 
 (window as any).rbLabTab          = switchTab;
+(window as any).rbLabFix          = handleFix;
+(window as any).rbLabHistoryPick  = (val: string) => {
+  if (!val) return;
+  const ta = document.getElementById('rb-voice-text') as HTMLTextAreaElement | null;
+  if (ta) { ta.value = val; ta.focus(); }
+  const sel = document.getElementById('rb-history-sel') as HTMLSelectElement | null;
+  if (sel) sel.value = '';
+};
 (window as any).rbLabSwitchAgent  = (id: string) => switchAgent(id as AgentId);
 (window as any).rbLabVoiceRecord  = handleVoiceRecord;
 (window as any).rbLabAction       = (mode: string) => handleAction(mode as 'code' | 'polish');

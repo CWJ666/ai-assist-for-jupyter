@@ -55,6 +55,11 @@
 .rb-btn-row button:hover { background: #6d28d9; }
 .rb-btn-row button:disabled { opacity: .5; cursor: default; }
 
+/* ── Fix error button ── */
+#rb-fix-btn { width: 100%; padding: 7px; border: 1px dashed #45475a; border-radius: 7px; background: none; color: #f38ba8; font-size: 12px; font-family: inherit; cursor: pointer; transition: background .15s, border-color .15s; }
+#rb-fix-btn:hover { background: #2a1a1a; border-color: #f38ba8; }
+#rb-fix-btn:disabled { opacity: .5; cursor: default; }
+
 /* ── Voice textarea ── */
 #rb-voice-text { width: 100%; box-sizing: border-box; min-height: 60px; max-height: 200px; padding: 6px 9px; border-radius: 6px; border: 1px solid #45475a; background: #313244; color: #cdd6f4; font-size: 12px; font-family: inherit; outline: none; resize: vertical; line-height: 1.5; }
 #rb-voice-text:focus { border-color: #7c3aed; }

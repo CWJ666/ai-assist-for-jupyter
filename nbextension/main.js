@@ -282,6 +282,21 @@ define(['base/js/namespace'], function (Jupyter) {
       });
     }
 
+    // Codex models use /v1/responses endpoint
+    if (currentAgent === 'openai' && model.indexOf('codex') !== -1) {
+      return fetch('https://api.openai.com/v1/responses', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: model, instructions: systemPrompt, input: messages }),
+      }).then(function (r) {
+        if (!r.ok) return r.text().then(function (t) { throw new Error(cfg.label + ': ' + t); });
+        return r.json().then(function (d) {
+          var msg = (d.output || []).find(function (o) { return o.type === 'message'; });
+          return ((msg && msg.content || []).find(function (c) { return c.type === 'output_text'; }) || {}).text || '';
+        });
+      });
+    }
+
     // OpenAI-compatible (OpenAI + Google Gemini)
     return fetch(cfg.baseUrl + '/chat/completions', {
       method: 'POST',
@@ -358,7 +373,7 @@ define(['base/js/namespace'], function (Jupyter) {
         transcribe(blob, ext, apiKey).then(function (text) {
           if (!text) throw new Error('No speech detected');
           var voiceBox = document.getElementById('rb-voice-text');
-          if (voiceBox) voiceBox.value = text;
+          if (voiceBox) voiceBox.value = voiceBox.value ? voiceBox.value + '\n' + text : text;
           setStatus('✓ Done. Edit if needed, then click the button below.');
         }).catch(function (e) {
           setStatus('❌ ' + e.message, true);
@@ -388,11 +403,13 @@ define(['base/js/namespace'], function (Jupyter) {
         return chatComplete(PROMPT_CODE, [{ role: 'user', content: text }], model, apiKey).then(function (code) {
           code = code.replace(/^```(?:python)?\s*/m, '').replace(/\s*```$/m, '').trim();
           insertCodeCell(code);
+          if (voiceBox) voiceBox.value = '';
           setStatus('✓ Code inserted below active cell');
         });
       } else {
         return chatComplete(PROMPT_POLISH, [{ role: 'user', content: text }], model, apiKey).then(function (bullets) {
           insertMarkdownCell(bullets);
+          if (voiceBox) voiceBox.value = '';
           setStatus('✓ Notes inserted (two-column layout)');
         });
       }

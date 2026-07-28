@@ -12,8 +12,8 @@ labextension/rb_assistant_lab/labextension/static/
 # Python
 **/__pycache__/
 *.py[cod]
-dist/
-build/
+labextension/dist/
+labextension/build/
 .eggs/
 
 # Editor / tools

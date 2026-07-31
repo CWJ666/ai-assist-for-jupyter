@@ -312,12 +312,37 @@ async function chatComplete(
 
 // ── Cell insertion ────────────────────────────────────────────────────────────
 
-function insertCodeCell(code: string): void {
+function insertCodeCell(code: string): any {
   const nb = tracker.currentWidget?.content;
-  if (!nb) return;
+  if (!nb) return null;
   NotebookActions.insertBelow(nb);
   const cell = nb.activeCell;
   if (cell) cell.model.sharedModel.setSource(code);
+  return cell;
+}
+
+async function runAndDebug(cell: any, apiKey: string, model: string): Promise<void> {
+  const MAX = 3;
+  const nb = tracker.currentWidget?.content;
+  if (!nb || !tracker.currentWidget?.sessionContext.session?.kernel) {
+    setStatus('✓ Code inserted (no kernel — run manually)');
+    return;
+  }
+  for (let attempt = 1; attempt <= MAX; attempt++) {
+    setStatus(`Running… (${attempt}/${MAX})`);
+    nb.activeCellIndex = nb.widgets.indexOf(cell);
+    await NotebookActions.run(nb, tracker.currentWidget!.sessionContext);
+    const outputs: any[] = (cell.model as any).outputs?.toJSON?.() || [];
+    const err = outputs.find((o: any) => o.output_type === 'error');
+    if (!err) { setStatus('✓ Code ran successfully'); return; }
+    if (attempt === MAX) { setStatus(`⚠ Still has errors after ${MAX} attempts`, true); return; }
+    setStatus(`Error → fixing… (${attempt}/${MAX})`);
+    const code = cell.model.sharedModel.getSource();
+    const errText = `${err.ename}: ${err.evalue}\n${(err.traceback || []).join('\n').replace(/\x1b\[[0-9;]*m/g, '')}`;
+    let fixed = await chatComplete(PROMPT_FIX, [{ role: 'user', content: `Code:\n\`\`\`python\n${code}\n\`\`\`\n\nError:\n${errText}` }], model, apiKey);
+    fixed = fixed.replace(/^```(?:python)?\s*/m, '').replace(/\s*```$/m, '').trim();
+    cell.model.sharedModel.setSource(fixed);
+  }
 }
 
 function insertMarkdownCell(bullets: string): void {
@@ -414,10 +439,11 @@ async function handleAction(mode: 'code' | 'polish'): Promise<void> {
     if (mode === 'code') {
       let code = await chatComplete(PROMPT_CODE, [{ role: 'user', content: text }], model, apiKey);
       code = code.replace(/^```(?:python)?\s*/m, '').replace(/\s*```$/m, '').trim();
-      insertCodeCell(code);
+      const cell = insertCodeCell(code);
       saveInputHistory(text);
       if (voiceBox) voiceBox.value = '';
-      setStatus('✓ Code inserted below active cell');
+      if (cell) await runAndDebug(cell, apiKey, model);
+      else setStatus('✓ Code inserted');
     } else {
       const bullets = await chatComplete(PROMPT_POLISH, [{ role: 'user', content: text }], model, apiKey);
       insertMarkdownCell(bullets);

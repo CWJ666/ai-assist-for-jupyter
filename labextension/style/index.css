@@ -85,3 +85,8 @@
 #rb-chat-send, #rb-chat-voice { padding: 6px 10px; border: none; border-radius: 6px; background: #7c3aed; color: #fff; cursor: pointer; font-size: 13px; flex-shrink: 0; transition: background .15s; }
 #rb-chat-send:hover, #rb-chat-voice:hover { background: #6d28d9; }
 #rb-chat-voice.recording { background: #dc2626; }
+
+/* ── Bubble insert actions ── */
+.rb-bubble-actions { display: flex; gap: 4px; padding-left: 6px; }
+.rb-bubble-actions button { font-size: 11px; padding: 2px 8px; border-radius: 5px; border: 1px solid #45475a; background: none; color: #a6adc8; font-family: inherit; cursor: pointer; transition: background .12s, color .12s; }
+.rb-bubble-actions button:hover { background: #313244; color: #cdd6f4; }

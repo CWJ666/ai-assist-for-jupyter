@@ -427,13 +427,29 @@ define(['base/js/namespace'], function (Jupyter) {
     if (!el) return;
     var div = document.createElement('div');
     div.className = 'rb-msg';
+    div.dataset.content = text;
     var bubble = document.createElement('div');
     bubble.className = 'rb-bubble ' + (role === 'user' ? 'user' : 'ai');
     bubble.textContent = text;
     div.appendChild(bubble);
+    if (role !== 'user') {
+      var actions = document.createElement('div');
+      actions.className = 'rb-bubble-actions';
+      actions.innerHTML = '<button onclick="rbInsertCode(this)">📝 Code</button><button onclick="rbInsertMd(this)">📄 Markdown</button>';
+      div.appendChild(actions);
+    }
     el.appendChild(div);
     el.scrollTop = el.scrollHeight;
   }
+
+  window.rbInsertCode = function (btn) {
+    var text = (btn.closest('.rb-msg') || {}).dataset && btn.closest('.rb-msg').dataset.content;
+    if (text) insertCodeCell(text);
+  };
+  window.rbInsertMd = function (btn) {
+    var text = (btn.closest('.rb-msg') || {}).dataset && btn.closest('.rb-msg').dataset.content;
+    if (text) insertMarkdownCell(text);
+  };
 
   function sendChat(text) {
     if (!text.trim()) return;

@@ -493,10 +493,17 @@ function appendBubble(role: string, text: string): void {
   if (!el) return;
   const div = document.createElement('div');
   div.className = 'rb-msg';
+  (div as any).dataset.content = text;
   const bubble = document.createElement('div');
   bubble.className = 'rb-bubble ' + (role === 'user' ? 'user' : 'ai');
   bubble.textContent = text;
   div.appendChild(bubble);
+  if (role !== 'user') {
+    const actions = document.createElement('div');
+    actions.className = 'rb-bubble-actions';
+    actions.innerHTML = '<button onclick="rbLabInsertCode(this)">📝 Code</button><button onclick="rbLabInsertMd(this)">📄 Markdown</button>';
+    div.appendChild(actions);
+  }
   el.appendChild(div);
   el.scrollTop = el.scrollHeight;
 }
@@ -646,6 +653,14 @@ class AIAssistantWidget extends Widget {
 (window as any).rbLabAction       = (mode: string) => handleAction(mode as 'code' | 'polish');
 (window as any).rbLabChatVoice    = handleChatVoice;
 (window as any).rbLabChatSend     = () => sendChat((document.getElementById('rb-chat-input') as HTMLTextAreaElement | null)?.value || '');
+(window as any).rbLabInsertCode   = (btn: HTMLElement) => {
+  const text = ((btn.closest('.rb-msg') as HTMLElement)?.dataset as any)?.content || '';
+  if (text) insertCodeCell(text);
+};
+(window as any).rbLabInsertMd     = (btn: HTMLElement) => {
+  const text = ((btn.closest('.rb-msg') as HTMLElement)?.dataset as any)?.content || '';
+  if (text) insertMarkdownCell(text);
+};
 (window as any).rbLabTogglePrefs  = togglePrefs;
 (window as any).rbLabSavePrefs    = savePrefs;
 (window as any).rbLabResetPrefs   = resetPrefs;
